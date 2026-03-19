@@ -11,44 +11,59 @@
 # Что происходит с глобальной константой PI, о чем предупреждает интерпретатор?
 const PI = 3.14159
 PI = 3.14
-
+# Константы в Julia объявляются с ключевым словом const. Они предназначены для неизменяемых значений. Попытка присвоить новое значение константе приводит к ошибке (или предуп. Интерпретатор предупреждает, что константа не должна изменяться.
 # Что происходит с типами глобальных переменных ниже, какого типа `c` и почему?
-a = 1
-b = 2.0
-c = a + b
-
+a = 1 #int
+b = 2.0 #Float64
+c = a + b # В c присваивается сумма этих переменных julia автоматически переведёт a-Float64, и c-Float64 
 # Что теперь произошло с переменной а? Как происходит биндинг имен в Julia?
 a = "foo"
-
+# В julia переменные это имена которые привязываются к объектам, тогда тип переменной определяется объектом на который она ссылается в данный момент, т.е. a-'string'
 # Что происходит с глобальной переменной g и почему? Чем ограничен биндинг имен в Julia?
-g::Int = 1
-g = "hi"
-
+g::Int = 1 # Переменная g всегда должна быть типа int
+g = "hi" # Тут интерпретар выдаст ошибку MethodError о том что попытались передать в g строку
 function greet()
     g = "hello"
     println(g)
 end
 greet()
-
+# В функции задаётся локальная переменная g, поэтому ошибки возникать не будет, глобальная переменная изменятся не будет
+function greet()
+    global g = "hello"
+    println(g)
+end
+greet()
+# Если же написать global то будет использоваться глобальная переменная и возникнет такая же ошибка как и с "hi"
 # Чем отличаются присвоение значений новому имени - и мутация значений?
 v = [1,2,3]
-z = v
-v[1] = 3
-v = "hello"
-z
-
+z = v # Теперь z-ссылается на массив(тоесть на объект)
+v[1] = 3 # Мутация массива(изменение самого объекта)
+v = "hello" #Теперь v - перенаправляется на строку 
+z #  Остаётся не изменным ссылается на тот же объект(массив)
+#Тоесть за счёт мутации мы меняем сам объект, а через присвоение меняем объект на который ссылается переменная, при этом другие переменные продолжают ссылаться на тот же объект 
 # Написать тип, параметризованный другим типом
-
+struct point{T}
+    x::T
+    y::T
+end
 #=
 Написать функцию для двух аругментов, не указывая их тип,
 и вторую функцию от двух аргментов с конкретными типами,
 дать пример запуска
 =#
-
+function mul(a, b)
+    return a*b
+end
+function mul_int(a::Int, b::Int)
+    return a*b  
+end
+println(mul(3, 3.14)) #9.42
+println(mul_int(3, 5)) #15
+println(mul_int(3.12, 4)) #MethodError
 #=
-Абстрактный тип - ключевое слово?
-Примитивный тип - ключевое слово?
-Композитный тип - ключевое слово?
+Абстрактный тип - ключевое слово? Ответ: abstract type
+Примитивный тип - ключевое слово? Ответ: primitive type
+Композитный тип - ключевое слово? Ответ: struct или mutable struct
 =#
 
 #=
@@ -57,7 +72,24 @@ z
 Выполнить функции над объектами подтипов 1 и 2 и объяснить результат
 (функция выводит произвольный текст в консоль)
 =#
+abstract type Animals end
+struct Dog<:Animals
+    name::String
+end
+struct Cat<:Animals
+    name::String
+end
+function ber(p::Animals)
+    println("something")
+end
+function ber(p1::Cat)
+    println("$(p1.name), hi")    
+end
+c1 = Cat("v")
+d1 = Dog("r")
 
+ber(d1)
+ber(c1)
 
 #===========================================================================================
 2. Функции:
@@ -68,21 +100,64 @@ z
 =#
 
 # Пример обычной функции
+function add(a, b)
+    return a + b 
+end
 
 # Пример лямбда-функции (аннонимной функции)
+f = x -> x^2
 
 # Пример функции с переменным количеством аргументов
-
+function su(args...)
+    t = 0
+    for i in 1:length(args)
+        t+=args[i]
+    end
+    return t
+end 
+su(2, 3, 4, 34, 34)
 # Пример функции с именованными аргументами
+function greet(;name = "rex", som = "?")
+    println("Hello $name, how are you $som")
+end
+greet(name="v")
 
 # Функции с переменным кол-вом именованных аргументов
-
+function rom(; n...)
+    for (k, g) in n
+        println("$k = $g")
+    end
+end
+rom(a = 3, b = "ref", c = 4.23)
 #=
 Передать кортеж в функцию, которая принимает на вход несколько аргументов.
 Присвоить кортеж результату функции, которая возвращает несколько аргументов.
 Использовать splatting - деструктуризацию кортежа в набор аргументов.
 =#
+function trig(a::Int, b::Int, c::Int)
+    if (a+b > c) && (a+c > b) && (c+b > a) 
+        if (a^2 + b^2 == c^2) || (a^2 + c^2 == b^2) || (c^2 + b^2 == a^2)
+            return "triangle", "rectangular"
+        end
+    return "triangle", "not rectangular"
+    else 
+        return "garbage", "Not interesting"
+    end
+end
+num = (3, 4, 5)
+result = trig(num...)
+println(result)                 
+println(typeof(result))
+category, property = trig(num...)
+println("Категория: $category, Свойство: $property")
+function print_all(args...)
+    for (i, arg) in enumerate(args)
+        println("Аргумент $i: $arg")
+    end
+end
 
+data = (10, "hello", 3.14, 45, 34)
+print_all(data...)
 
 #===========================================================================================
 3. loop fusion, broadcast, filter, map, reduce, list comprehension
@@ -93,7 +168,16 @@ z
 - через loop fusion и
 - с помощью reduce
 =#
-
+function mult(arr::Int...)
+    m = 1
+    for x in (arr)
+        m *= x
+    end
+    return m
+end
+arr1 = [3, 4, 6]
+mult(arr1...)
+mult1 = reduce(*, arr1)
 #=
 Написать функцию от одного аргумента и запустить ее по всем элементам массива
 с помощью точки (broadcast)
@@ -101,25 +185,34 @@ c помощью map
 c помощью list comprehension
 указать, чем это лучше явного цикла?
 =#
-
+function by_el(x)
+    return x^2
+end
+by_el.(arr1)
+map(by_el, arr1)
+[by_el(i) for i in arr1]
+#кратко и читаемо, более производительно, проще не ошибится
 # Перемножить вектор-строку [1 2 3] на вектор-столбец [10,20,30] и объяснить результат
-
-
+v = [1 2 3]
+v1 = [10,20,30]
+v*v1
+#Матричное перемножение v - 3 символа по горизонтали и v1 - 3 по вертикали, в данном случае тоже самое что скалярное произведение векторов
 # В одну строку выбрать из массива [1, -2, 2, 3, 4, -5, 0] только четные и положительные числа
-
+println([x for x in [1, -2, 2, 3, 4, -5, 0] if x>0 && x%2==0])
 
 # Объяснить следующий код обработки массива names - что за number мы в итоге определили?
 using Random
 Random.seed!(123)
 names = [rand('A':'Z') * '_' * rand('0':'9') * rand([".csv", ".bin"]) for _ in 1:100]
+#генерирует массив с 100 элементами вида (случайная буква_случайнная цифра.bin или csv)
 # ---
-same_names = unique(map(y -> split(y, ".")[1], filter(x -> startswith(x, "A"), names)))
+same_names = unique(map(y -> split(y, ".")[1], filter(x -> startswith(x, "A"), names))) #оставляет только уникальные элементы вида A_случайная цифра
 numbers = parse.(Int, map(x -> split(x, "_")[end], same_names))
 numbers_sorted = sort(numbers)
-number = findfirst(n -> !(n in numbers_sorted), 0:9)
-
+umber = findfirst(n -> !(n in numbers_sorted), 0:9)
+#number – это наименьшая цифра (от 0 до 9), которая не встречается среди цифр в именах файлов, начинающихся на 'A'.
 # Упростить этот код обработки:
-
+number = findfirst(n -> !(n in unique(parse.(Int, [split(split(name, ".")[1], "_")[2] for name in names if startswith(name, "A")]))), 0:9)
 
 #===========================================================================================
 4. Свой тип данных на общих интерфейсах
@@ -129,7 +222,13 @@ number = findfirst(n -> !(n in numbers_sorted), 0:9)
 написать свой тип ленивого массива, каждый элемент которого
 вычисляется при взятии индекса (getindex) по формуле (index - 1)^2
 =#
-
+struct Lazy_Squares_Array <: AbstractArray{Int, 1}
+    len::Int
+end
+Base.size(A::Lazy_Squares_Array) = (A.len,)
+Base.getindex(A::Lazy_Squares_Array, i::Int) = (i - 1)^2
+a = Lazy_Squares_Array(23)
+a[21]
 #=
 Написать два типа объектов команд, унаследованных от AbstractCommand,
 которые применяются к массиву:
@@ -139,17 +238,58 @@ number = findfirst(n -> !(n in numbers_sorted), 0:9)
 =#
 abstract type AbstractCommand end
 apply!(cmd::AbstractCommand, target::Vector) = error("Not implemented for type $(typeof(cmd))")
+struct SortCmd <: AbstractCommand 
+end
+function apply!(cmd::SortCmd, target::Vector)
+    sort!(target)
+end
+struct ChangeAtCmd <: AbstractCommand
+    i::Int
+    val::Any
+end
+function apply!(cmd::ChangeAtCmd, target::Vector)
+    if 1 <= cmd.i <= length(target)
+        target[cmd.i] = cmd.val
+    else
+        error("Index out of bounds")
+    end
+end
+v = [1, 23, 34 , 34]
+sort_cmd = SortCmd()
+apply!(sort_cmd, v)
+change_cmd = ChangeAtCmd(2, 99)
+apply!(change_cmd, v)
+println(v)
 
 
 # Аналогичные команды, но без наследования и в виде замыканий (лямбда-функций)
-
-
+function make_sort_cmd()
+    return target -> sort!(target)
+end
+function make_changeat_cmd(i, val)
+    return target -> (target[i] = val; target)
+end
+sort_cmd = make_sort_cmd()
+sort_cmd(v)
+change_cmd = make_changeat_cmd(2, 99)
+change_cmd(v)
+println(v)
 #===========================================================================================
 5. Тесты: как проверять функции?
 =#
 
 # Написать тест для функции
+function add(a, b)
+    return a + b
+end
+using Test
 
+@testset "Тесты для add" begin
+    @test add(2, 3) == 5
+    @test add(-1, 1) == 0
+    @test add(0, 0) == 0
+end
+# Другие полезные макросы @test_throws - проверка на корректность, @test_broken-Помечает тест как «сломанный» (broken), @test_logs - чтобы убедиться, что функция правильно логирует события
 
 #===========================================================================================
 6. Дебаг: как отладить функцию по шагам?
@@ -158,7 +298,18 @@ apply!(cmd::AbstractCommand, target::Vector) = error("Not implemented for type $
 #=
 Отладить функцию по шагам с помощью макроса @enter и точек останова
 =#
-
+using Pkg
+Pkg.add("Debugger")
+using Debugger
+function factorial(n)
+    result = 1
+    for i in 1:n
+        result *= i
+    end
+    return result     
+end
+Debugger.@enter factorial(5) #пользовался lldb, команды очень похожи
+@bp #точка останова
 
 #===========================================================================================
 7. Профилировщик: как оценить производительность функции?
@@ -179,7 +330,17 @@ function generate_data(len)
     return vec3
 end
 
+using Pkg
+Pkg.add("Profile")
+Pkg.add("ProfileView")
+using Profile, ProfileView
 @time generate_data(1_000_000);
+
+
+# Запускаем профилирование
+Profile.clear()            # очищаем старые данные
+@profile generate_data(1_000_000)   # собираем профиль
+ProfileView.view()         # открываем интерактивный флейм-чарт
 
 
 # Переписать функцию выше так, чтобы она выполнялась быстрее:
