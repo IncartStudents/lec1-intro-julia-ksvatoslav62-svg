@@ -7,24 +7,43 @@ mutable struct Life
     next_frame::Matrix{Int}
 end
 
+function count_neighbors(cf::Matrix{Int}, x::Int, y::Int)
+    n, m = size(cf)
+    count = 0
+    for i in -1:1
+        for j in -1:1
+            if i == 0 && j == 0
+                continue
+            end
+            nx, ny = x + i, y + j
+            if 1 <= nx <= n && 1 <= ny <= m
+                count += cf[nx, ny]
+            end
+        end
+    end
+    return count
+end
+
 function step!(state::Life)
     curr = state.current_frame
     next = state.next_frame
-
-    #=
-    TODO: вместо случайного шума
-    реализовать один шаг алгоритма "Игра жизнь"
-    =#
-    for i in 1:length(curr)
-        curr[i] = rand(0:1)
+    next .= curr
+    n, m = size(curr)
+    for i in 1:n
+        for j in 1:m
+            neighbors = count_neighbors(curr, i, j)
+            if curr[i,j] == 1
+                if neighbors < 2 || neighbors > 3
+                    next[i,j] = 0
+                end
+            else
+                if neighbors == 3
+                    next[i,j] = 1
+                end
+            end
+        end
     end
-
-    # Подсказка для граничных условий - тор:
-    # julia> mod1(10, 30)
-    # 10
-    # julia> mod1(31, 30)
-    # 1
-
+    curr .= next
     return nothing
 end
 
