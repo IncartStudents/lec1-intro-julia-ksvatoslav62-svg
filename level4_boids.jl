@@ -9,6 +9,7 @@ mutable struct Boid
 end
 
 mutable struct WorldState
+    dt::Float64
     boids::Vector{Boid}
     height::Float64
     width::Float64
@@ -19,17 +20,37 @@ mutable struct WorldState
     k_coh::Float64 # Коэфицент стремления к массам
     k_drag::Float64 # Сопротивление среды 
     function WorldState(n_boids, height, width;
-         max_speed = 3.0, vision_radius=5.0, vision_angle=2*pi/3, k_sep = 1.0, k_align = 1.3, k_coh = 1.5, k_drag = 0.5)
+         max_speed = 6.0, vision_radius=4.0, vision_angle=2*pi/3, k_sep = 1.0, k_align = 1, k_coh = 1, k_drag = 0.5, dt = 0.05)
         # TODO: добавить случайные позиции для n_boids птичек вместо одной
         boids = [Boid((rand()*width, rand()*height), 
         (rand()*2-1, rand()*2-1), vision_radius, vision_angle, rand()*0.5 + 0.5)
         for _ in 1:n_boids]
         
-        new(boids, height, width, max_speed, k_sep, k_align, k_coh, k_drag)
+        new(boids, height, width, max_speed, k_sep, k_align, k_coh, k_drag, dt)
     end
 end
 
-function update!(state::WorldState, dt::Float64)
+struct ScalarField_temp <: AbstractArray{Float64,2}
+    data::Vector{Float64}
+    rows::Int
+    cols::Int
+end
+function ScalarField_temp(state::WorldState,)
+    colm = state.width/(state.dt*state.max_speed/2^0.5)/10
+    rows = state.height/(state.dt*state.max_speed/2^0.5)/10
+    data = Vector{Float64}(undef, rows * colm)
+    Base.size(feild::ScalarField_temp) = (feild.rows, feild.cols)
+    for i in 1:feild_temp.rows
+        for j in 1:feild_temp.colms
+            value = (i^2 + j^2)/sin(i*j) * cos(dt*0.1)
+            feild_temp[i, j]  = value
+        end
+    end
+    return feild_temp
+
+end
+
+function update!(state::WorldState)
     # TODO: реализация уравнения движения птичек
     n = length(state.boids)
     
@@ -98,18 +119,21 @@ function update!(state::WorldState, dt::Float64)
 end
     for i in 1:n
         berd_i = state.boids[i]
+        r = (berd_i.pos[1]^2 +berd_i.pos[2]^2)^0.5
+        vel_x = (-berd_i.pos[2] + berd_i.pos[1]*(1-r^2))/100 # функция поля 
+        vel_y= (berd_i.pos[1] + berd_i.pos[2]*(1-r^2))/100
         F = forses[i]
         ax = F[1]/berd_i.mass
         ay = F[2]/berd_i.mass
-        new_vx = berd_i.vel[1] + ax * dt
-        new_vy = berd_i.vel[2] + ay * dt
+        new_vx = berd_i.vel[1]+vel_x + ax * state.dt
+        new_vy = berd_i.vel[2]+vel_y + ay * state.dt
         berd_i.vel = (new_vx, new_vy)
         speed = sqrt(berd_i.vel[1]^2 + berd_i.vel[2]^2)
         if speed > state.max_speed
             berd_i.vel = (berd_i.vel[1]/speed * state.max_speed, berd_i.vel[2]/speed * state.max_speed)
         end
-        new_px = berd_i.pos[1] + berd_i.vel[1] * dt
-        new_py = berd_i.pos[2] + berd_i.vel[2] * dt
+        new_px = berd_i.pos[1] + berd_i.vel[1] * state.dt
+        new_py = berd_i.pos[2] + berd_i.vel[2] * state.dt
         berd_i.pos = (new_px, new_py)
     end
     return nothing
@@ -122,12 +146,12 @@ function (@main)(ARGS)
 
     state = WorldState(n_boids, w, h)
 
-    anim = @animate for time = 1:100
-        update!(state, 0.05)
-        positions = [b.pos for b in state.boids]   # убрана лишняя строка
+    anim = @animate for time = 1:200
+        update!(state)
+        positions = [b.pos for b in state.boids]
         scatter(positions, xlim=(0, state.width), ylim=(0, state.height))
     end
-    gif(anim, "boids.gif", fps = 10)
+    gif(anim, "boids.gif", fps = 24)
 end
 
 end  
