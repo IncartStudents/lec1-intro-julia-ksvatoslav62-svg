@@ -9,7 +9,6 @@ mutable struct Boid
 end
 
 mutable struct WorldState
-    dt::Float64
     boids::Vector{Boid}
     height::Float64
     width::Float64
@@ -19,6 +18,7 @@ mutable struct WorldState
     k_align::Float64 # Коэфиунь выравнивания
     k_coh::Float64 # Коэфицент стремления к массам
     k_drag::Float64 # Сопротивление среды 
+    dt::Float64
     function WorldState(n_boids, height, width;
          max_speed = 6.0, vision_radius=4.0, vision_angle=2*pi/3, k_sep = 1.0, k_align = 1, k_coh = 1, k_drag = 0.5, dt = 0.05)
         # TODO: добавить случайные позиции для n_boids птичек вместо одной
@@ -30,29 +30,64 @@ mutable struct WorldState
     end
 end
 
-struct ScalarField_temp <: AbstractArray{Float64,2}
-    data::Vector{Float64}
+struct ScalarField_temp{T<:AbstractFloat} <: AbstractArray{T,2}
+    data::Vector{T}
     rows::Int
     cols::Int
 end
-function ScalarField_temp(state::WorldState,)
-    colm = state.width/(state.dt*state.max_speed/2^0.5)/10
-    rows = state.height/(state.dt*state.max_speed/2^0.5)/10
-    data = Vector{Float64}(undef, rows * colm)
-    Base.size(feild::ScalarField_temp) = (feild.rows, feild.cols)
-    for i in 1:feild_temp.rows
-        for j in 1:feild_temp.colms
-            value = (i^2 + j^2)/sin(i*j) * cos(dt*0.1)
-            feild_temp[i, j]  = value
+Base.size(field::ScalarField_temp) = (field.rows, field.cols)
+function Base.getindex(field::ScalarField_temp, i::Int, j::Int)
+    @boundscheck checkbounds(field, i, j)
+    index = (j-1)*field.rows + i
+    return field.data[index]
+end
+function Base.setindex!(field::ScalarField_temp, value::Float64, i::Int, j::Int)
+    @boundscheck checkbounds(field, i, j)
+    index = (j-1)*field.rows + i
+    field.data[index] = value
+end
+function ScalarField_temp(state::WorldState, n::Int64) # n-номер шага на котором находимся
+    cols = Int(round(state.width/(state.dt*state.max_speed/sqrt(2))))*10
+    rows = Int(round(state.height/(state.dt*state.max_speed/sqrt(2))))*10
+    data = Vector{Float64}(undef, rows * cols)
+    field_temp = ScalarField_temp{Float64}(data, rows, cols)
+    for i in 1:field_temp.rows
+        for j in 1:field_temp.cols
+            value = (i^2 + j^2)/(sin(i*j) < 1e-6 ? 1e-6 : sin(i*j)) * cos(n*state.dt/1000)
+            field_temp[i, j]  = value
         end
     end
-    return feild_temp
-
+    return field_temp
 end
 
-function update!(state::WorldState)
-    # TODO: реализация уравнения движения птичек
+function d_grad(state::WorldState, field::ScalarField_temp)
     n = length(state.boids)
+    vel_temps = Vector{NTuple{2, Float64}}(undef, n)
+    for i in 1:n
+        berd_i = state.boids[i]
+        pos = (Int(round(berd_i.pos[1]/(state.dt*state.max_speed/sqrt(2))))*10, Int(round(berd_i.pos[2]/(state.dt*state.max_speed/sqrt(2))))*10)
+        if pos[1] < 1 || pos[1] >= field.cols || pos[2] < 1 || pos[2] >= field.rows
+            vel_temps[i] = (0.0, 0.0)
+            continue
+        end
+        temp = field[pos[1], pos[2]]
+        dtemp_x = ( field[pos[1]+1, pos[2]] - temp)
+        dtemp_y = ( field[pos[1], pos[2]+1] - temp)
+        len = sqrt(dtemp_x^2 + dtemp_y^2)
+        if len > 1e-6
+            vel_temps[i] = (dtemp_x/len, dtemp_y/len)
+        else
+            vel_temps[i] = (0.0, 0.0)
+        end
+    end
+    return vel_temps
+end
+
+function update!(state::WorldState, g::Int)
+    # TODO: реализация уравнения движения птичек
+    field = ScalarField_temp(state, g)
+    n = length(state.boids)
+    vel_temps = d_grad(state, field)
     
     forses = [(0.0, 0.0) for _ in 1:n]
 
@@ -118,15 +153,13 @@ function update!(state::WorldState)
     forses[i] = total_F
 end
     for i in 1:n
+        vel_temp = vel_temps[i]
         berd_i = state.boids[i]
-        r = (berd_i.pos[1]^2 +berd_i.pos[2]^2)^0.5
-        vel_x = (-berd_i.pos[2] + berd_i.pos[1]*(1-r^2))/100 # функция поля 
-        vel_y= (berd_i.pos[1] + berd_i.pos[2]*(1-r^2))/100
         F = forses[i]
         ax = F[1]/berd_i.mass
         ay = F[2]/berd_i.mass
-        new_vx = berd_i.vel[1]+vel_x + ax * state.dt
-        new_vy = berd_i.vel[2]+vel_y + ay * state.dt
+        new_vx = berd_i.vel[1]+ vel_temp[1] + ax * state.dt
+        new_vy = berd_i.vel[2]+ vel_temp[2] + ay * state.dt
         berd_i.vel = (new_vx, new_vy)
         speed = sqrt(berd_i.vel[1]^2 + berd_i.vel[2]^2)
         if speed > state.max_speed
@@ -147,7 +180,7 @@ function (@main)(ARGS)
     state = WorldState(n_boids, w, h)
 
     anim = @animate for time = 1:200
-        update!(state)
+        update!(state, time)
         positions = [b.pos for b in state.boids]
         scatter(positions, xlim=(0, state.width), ylim=(0, state.height))
     end
